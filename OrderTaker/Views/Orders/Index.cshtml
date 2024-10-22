@@ -1,0 +1,82 @@
+﻿@model IEnumerable<OrderTaker.Models.Order>
+
+@{
+    ViewData["Title"] = "Orders";
+}
+<p>
+    <a asp-action="Create">Create New</a>
+</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.Customer)
+            </th>
+            <th>
+                Delivery Date
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Status)
+            </th>
+            <th>
+                Total Amount
+            </th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.Customer.FullName)
+            </td>
+            <td>
+                @item.DeliveryDate.ToString("dd-MMM-yyyy")
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Status)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.TotalAmount)
+            </td>
+            <td>
+                <a asp-action="Edit" class="btn btn-success editCustomer" asp-route-id="@item.Id">Edit</a> 
+            </td>
+        </tr>
+}
+    </tbody>
+</table>
+<script>
+    $('.deleteCustomer').click(function () {
+        var deleteUrl = $(this).data('url');
+
+        Swal.fire({
+            showCancelButton: true,
+            title: 'Warning',
+            text: 'Do you want to continue',
+            icon: 'warning',
+            confirmButtonText: 'Yes',
+            cancelButtonText: 'No',
+            confirmButtonColor: '#dd6b55'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: deleteUrl,
+                    type: 'POST',
+                    success: function (response) {
+                        if (response == "success") {
+                            Swal.fire('Deleted!', 'Order has been deleted.', 'success').then(result1 => {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire('Error!', 'There was a problem deleting the order.', 'error');
+                        }
+                    },
+                    error: function () {
+                        Swal.fire('Error!', 'There was a problem deleting the order.', 'error');
+                    }
+                });
+            }
+        })
+    });
+</script>

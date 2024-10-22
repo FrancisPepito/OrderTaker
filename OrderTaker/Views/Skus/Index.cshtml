@@ -1,0 +1,203 @@
+﻿@model IEnumerable<OrderTaker.Models.Sku>
+
+@{
+    ViewData["Title"] = "SKUs";
+}
+
+<p>
+    <button type="button" id="createNewSku" class="btn btn-primary" data-toggle="modal" data-target="#skuModal">Create New</button>
+</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                Name
+            </th>
+            <th>
+                Code
+            </th>
+            <th>
+                Unit Price
+            </th>
+            <th>
+                Active
+            </th>
+            <th>
+                Image
+            </th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Name)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Code)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.UnitPrice)
+                </td>
+                <td>
+                    @if (item.IsActive)
+                    {
+                        <p>Yes</p>
+                    }
+                    else
+                    {
+                        <p>No</p>
+                    }
+                </td>
+                <td>
+                    <img src="@item.ImagePath" width="50" height="50" />
+                </td>
+                <td>
+                    <button type="button" class="btn btn-success editSku" data-toggle="modal" data-target="#skuModal" data-id="@item.Id">Edit</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<div class="modal fade" id="skuModal" tabindex="-1" role="dialog" aria-labelledby="skuModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form id="SkuForm" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="SkuModalLabel">Sku</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" class="form-control" required name="name" />
+                        <label>Code</label>
+                        <input type="text" class="form-control" required name="code" />
+                        <label>Unit Price</label>
+                        <input type="number" min="0" class="form-control" required name="unitPrice" />
+                        <label>Image</label>
+                        <input type="file" class="form-control" accept="image/*" name="imagePath" id="imageInput" />
+                        <img id="imagePreview" style="display:none; margin-top:10px; max-width:100%;" />
+
+                        @section Scripts {
+                            <script>
+                                document.getElementById("imageInput").addEventListener("change", function (event) {
+                                    const file = event.target.files[0];
+                                    if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = function (e) {
+                                            const imagePreview = document.getElementById("imagePreview");
+                                            imagePreview.src = e.target.result;
+                                            imagePreview.style.display = "block";
+                                        };
+                                        reader.readAsDataURL(file);
+                                    } else {
+                                        imagePreview.style.display = "none";
+                                    }
+                                });
+                            </script>
+                        }
+                        <label>Active</label>
+                        <input type="checkbox" class="form-control" name="isActive" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <input type="submit" id="" class="btn btn-primary">
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    $(document).ready(function () {
+        $('#createNewSku').click(function () {
+            $('#SkuModalLabel').text('Create New Sku');
+            $('#skuModal input[name="name"]').val('');
+            $('#skuModal input[name="code"]').val('');
+            $('#skuModal input[name="unitPrice"]').val('');
+            $('#skuModal input[name="isActive"]').prop('checked', false);
+            $('#skuModal input[name="image"]').val('');
+
+
+            $('#skuModal form').attr('action', '/Skus/create'); // Change action URL for create
+
+        });
+
+        $('.editSku').click(function () {
+            var SkuId = $(this).data('id');
+
+            $('#SkuModalLabel').text('Edit Sku');
+
+            $.get('/Skus/Details/' + SkuId, function (data) {
+                $('#skuModal input[name="name"]').val(data.name);
+                $('#skuModal input[name="code"]').val(data.code);
+                $('#skuModal input[name="unitPrice"]').val(data.unitPrice);
+                $('#skuModal input[name="isActive"]').prop('checked', data.isActive);
+                var filename = data.imagePath.split('/').pop();
+                $('#skuModal input[name="image"]').val(filename);
+                $('#imagePreview').attr('src', data.imagePath).show();  
+
+
+                $('#skuModal form').attr('action', '/Skus/edit/' + SkuId); // Change action URL for edit
+
+            });
+        });
+
+        $(document).on('submit', '#SkuForm', function (e) {
+            e.preventDefault();
+            var form = $(this)[0];
+            var formData = new FormData(form);             
+            var actionUrl = $(this).attr('action');
+
+            formData.set('isActive', $('#skuModal input[name="isActive"]').is(':checked') ? 'true' : 'false');
+
+            $.ajax({
+                url: $(this).attr('action'),
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType:false,
+                success: function (response) {
+                    if (response.status == 'success') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sku saved',
+                            text: response.message,
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#3085d6'
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.message,
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#d33'
+                        });
+                    }
+                },
+                error: function (xhr, status, error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: error,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#d33'
+                    });
+                }
+            });
+        });
+    });
+</script>
+

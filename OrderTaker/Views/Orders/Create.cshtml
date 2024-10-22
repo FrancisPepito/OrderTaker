@@ -1,0 +1,275 @@
+﻿@model OrderTaker.Models.OrderViewModel
+
+@{
+    ViewData["Title"] = "Create";
+    var tomorrow = @DateTime.Now.AddDays(1).ToString("yyyy-MM-dd");
+}
+
+<h4>Order</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Create">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <label asp-for="Order.CustomerId" class="control-label"></label>
+                <select asp-for="Order.CustomerId" class="form-control select2">
+                    <option value="">Select Customer</option>
+                    @foreach (var customer in Model.CustomerList)
+                    {
+                        <option value="@customer.Id">@customer.FullName</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group">
+                <label asp-for="Order.DeliveryDate" class="control-label"></label>
+                <input asp-for="Order.DeliveryDate" class="form-control"
+                       type="date"
+                       min="@DateTime.Now.AddDays(1).ToString("yyyy-MM-dd")"
+                       value="@DateTime.Now.AddDays(1).ToString("yyyy-MM-dd")" />
+                <span asp-validation-for="Order.DeliveryDate" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Order.Status" class="control-label"></label>
+                <select asp-for="Order.Status" class="form-control">
+                    <option value="">Select Status</option>
+                    <option value="New">New</option>
+                    <option value="Processed">Processed</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Delivered">Completed</option>
+                </select>
+                <span asp-validation-for="Order.Status" class="text-danger"></span>
+            </div>
+            <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#orderItemModal">
+                Add Order Item
+            </button>
+
+            <div class="form-group">
+                <table class="table" id="orderItemsList">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Quantity</th>
+                            <th>Total Price</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Order.TotalAmount" class="control-label">Total Amount</label>
+                <input asp-for="Order.TotalAmount" class="form-control" readonly />
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Submit" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+<!-- Order Item Modal -->
+<div class="modal fade" id="orderItemModal" tabindex="-1" role="dialog" aria-labelledby="orderItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="orderItemModalLabel">Add Order Item</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="skuSelect" class="form-label">SKU</label>
+                    <select id="skuSelect" class="form-control select2">
+                        <option value="">Select SKU</option>
+                        @foreach (var sku in Model.SkuList)
+                        {
+                            <option value="@sku.Id" data-price="@sku.UnitPrice">@sku.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="quantityInput">Quantity</label>
+                    <input type="number" id="quantityInput" class="form-control" min="1" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="addOrderItemBtn">Add Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let orderItems = [];
+    let editingIndex = null; 
+
+    $(document).ready(function () {
+        $('.select2').select2({
+            allowClear: true 
+        });
+        updateOrderItemsList();
+        $('form').on('submit', function (e) {
+            e.preventDefault();
+
+            var form = $(this);
+            var formData = form.serialize();
+
+            // Check if the form is valid before proceeding
+            if (!form.valid()) {
+                return;
+            }
+            $.ajax({
+                url: form.attr('action'),
+                type: 'POST',
+                data: formData,
+                success: function (response) {
+                    if (response.status === 'error') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.message
+                        });
+                    } else if (response.status === 'success') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success',
+                            text: 'Order updated successfully!'
+                        }).then(function () {
+                            window.location.href = response.redirectUrl;
+                        });
+                    }
+                },
+                error: function () {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Something went wrong. Please try again later.'
+                    });
+                }
+            });
+        });
+    });
+    document.getElementById('addOrderItemBtn').addEventListener('click', function () {
+        const skuId = document.getElementById('skuSelect').value;
+        const quantity = parseInt(document.getElementById('quantityInput').value);
+
+        if (orderItems.some(item => item.skuId === skuId) && editingIndex === null) {
+            alert('This SKU has already been added. Please select a different SKU.');
+            return;
+        }
+
+        if (skuId && quantity > 0) {
+            const skuPrice = getSkuPrice(skuId);
+
+            if (editingIndex !== null) {
+                // Update existing item
+                orderItems[editingIndex].quantity = quantity;
+                orderItems[editingIndex].price = skuPrice;
+                editingIndex = null; 
+            } else {
+                const orderItem = { skuId, quantity, price: skuPrice };
+                orderItems.push(orderItem);
+            }
+
+            updateOrderItemsList();
+            calculateTotalAmount();
+            $('#orderItemModal').modal('hide');
+            clearModalFields(); 
+        } else {
+            alert('Please select SKU and enter a valid quantity.');
+        }
+    }); function updateOrderItemsList() {
+        const tableBody = document.querySelector('#orderItemsList tbody');
+        tableBody.innerHTML = ''; // Clear current items
+
+        // Clear existing hidden inputs
+        document.querySelectorAll('input[name^="OrderItems"]').forEach(input => input.remove());
+
+        orderItems.forEach((item, index) => {
+            const row = document.createElement('tr');
+            const skuName = getSkuName(item.skuId); 
+            row.innerHTML = `
+                    <td>${skuName}</td>
+                    <td>${item.quantity}</td>
+                    <td>${(item.quantity * item.price).toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-warning" onclick="editOrderItem(${index})">Edit</button>
+                        <button class="btn btn-danger" onclick="removeOrderItem(${index})">Remove</button>
+                    </td>
+                `;
+
+            const skuIdInput = document.createElement('input');
+            skuIdInput.type = 'hidden';
+            skuIdInput.name = `OrderItems[${index}].SkuId`; 
+            skuIdInput.value = item.skuId;
+
+            const quantityInput = document.createElement('input');
+            quantityInput.type = 'hidden';
+            quantityInput.name = `OrderItems[${index}].Quantity`;
+            quantityInput.value = item.quantity;
+
+            const priceInput = document.createElement('input');
+            priceInput.type = 'hidden';
+            priceInput.name = `OrderItems[${index}].Price`;
+            priceInput.value = item.price;
+
+            document.querySelector('form').appendChild(skuIdInput);
+            document.querySelector('form').appendChild(quantityInput);
+            document.querySelector('form').appendChild(priceInput);
+
+            tableBody.appendChild(row);
+        });
+    }
+
+
+    function calculateTotalAmount() {
+        const totalAmountInput = document.querySelector('#Order_TotalAmount');
+        const total = orderItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+        totalAmountInput.value = total.toFixed(2);
+    }
+
+    function removeOrderItem(index) {
+        orderItems.splice(index, 1); 
+        updateOrderItemsList();
+        calculateTotalAmount();
+    }
+
+    function editOrderItem(index) {
+        editingIndex = index; 
+        const item = orderItems[index];
+        document.getElementById('skuSelect').value = item.id;
+        document.getElementById('quantityInput').value = item.quantity;
+        $('#orderItemModal').modal('show'); 
+    }
+
+    function clearModalFields() {
+        document.getElementById('skuSelect').value = '';
+        document.getElementById('quantityInput').value = '';
+    }
+
+    function getSkuPrice(skuId) {
+        const option = document.querySelector(`#skuSelect option[value="${skuId}"]`);
+        return option ? parseFloat(option.getAttribute('data-price')) : 0; 
+    }
+
+    function getSkuName(skuId) {
+        const option = document.querySelector(`#skuSelect option[value="${skuId}"]`);
+        return option ? option.text : ''; 
+    }
+</script>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

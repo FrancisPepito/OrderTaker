@@ -1,0 +1,174 @@
+﻿@model IEnumerable<OrderTaker.Models.Customer>
+
+@{
+    ViewData["Title"] = "Customers";
+}
+
+<p>
+    <button type="button" id="createNewCustomer" class="btn btn-primary" data-toggle="modal" data-target="#customerModal">Create New</button>
+</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                First Name
+            </th>
+            <th>
+                Last Name
+            </th>
+            <th>
+                Mobile Number
+            </th>
+            <th>
+                City
+            </th>
+            <th>
+                Active
+            </th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.FirstName)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.LastName)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.MobileNumber)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.City)
+            </td>
+            <td>
+                @if (item.IsActive)
+                {
+                    <p>Yes</p>
+                }
+                else
+                {
+                    <p>No</p>
+                }
+            </td>
+            <td>
+                    <button type="button"  class="btn btn-success editCustomer" data-toggle="modal" data-target="#customerModal" data-id="@item.Id">Edit</button>
+                </td>
+        </tr>
+}
+    </tbody>
+</table>
+
+<div class="modal fade" id="customerModal" tabindex="-1" role="dialog" aria-labelledby="customerModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form id="customerForm" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="customerModalLabel">Customer</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" class="form-control" required name="firstName" />
+                        <label>Last Name</label>
+                        <input type="text" class="form-control" required name="lastName" />
+                        <label>Mobile Number</label>
+                        <input type="number" min="9000000000" max="9999999999" class="form-control" required name="mobileNumber" />
+                        <label>City</label>
+                        <input type="text" class="form-control" required name="city" />
+                        <label>Active</label>
+                        <input type="checkbox" class="form-control"  name="isActive" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <input type="submit" id=""class="btn btn-primary">
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        $('#createNewCustomer').click(function () {
+            $('#customerModalLabel').text('Create New Customer');
+            $('#customerModal input[name="firstName"]').val('');
+            $('#customerModal input[name="lastName"]').val('');
+            $('#customerModal input[name="mobileNumber"]').val('');
+            $('#customerModal input[name="city"]').val('');
+
+            $('#customerModal form').attr('action', '/customers/create'); // Change action URL for create
+
+        });
+
+        $('.editCustomer').click(function () {
+            var customerId = $(this).data('id');
+
+            $('#customerModalLabel').text('Edit Customer');
+
+            $.get('/customers/edit/' + customerId, function (data) {
+                $('#customerModal input[name="firstName"]').val(data.firstName);
+                $('#customerModal input[name="lastName"]').val(data.lastName);
+                $('#customerModal input[name="mobileNumber"]').val(data.mobileNumber);
+                $('#customerModal input[name="city"]').val(data.city);
+
+                $('#customerModal input[name="isActive"]').prop('checked',data.isActive);
+
+                $('#customerModal form').attr('action', '/customers/edit/' + customerId); // Change action URL for edit
+
+            });
+        });
+
+        $(document).on('submit', '#customerForm', function (e) {
+            e.preventDefault();
+            var form = $(this)[0];
+            var formData = new FormData(form);             
+            formData.set('isActive', $('#customerModal input[name="isActive"]').is(':checked') ? 'true' : 'false');
+
+            $.ajax({
+                url: $(this).attr('action'),
+                type: 'POST',
+                data: formData,
+                processData: false, 
+                contentType: false, 
+                success: function (response) {
+                    if (response.status == 'success') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Customer saved',
+                            text: response.message,
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#3085d6'
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.message,
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#d33'
+                        });
+                    }
+                },
+                error: function (xhr, status, error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: error,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#d33'
+                    });
+                }
+            });
+        });
+    });
+</script>
